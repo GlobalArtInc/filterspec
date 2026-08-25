@@ -1,0 +1,197 @@
+{
+  "schema": {
+    "name": { "column": "name", "type": "string" },
+    "status": { "column": "status", "type": "string" },
+    "serviceId": { "column": "service_id", "type": "number" },
+    "attempts": { "column": "call_attempts", "type": "number" },
+    "createdAt": { "column": "created_at", "type": "date" },
+    "isActive": { "column": "is_active", "type": "boolean" },
+    "groupName": { "column": "name", "type": "string", "relation": "task_group" }
+  },
+  "cases": [
+    {
+      "name": "одиночный фильтр",
+      "filter": { "type": "string", "field": "name", "operator": "$eq", "value": "test" },
+      "sql": "\"name\" = $1",
+      "args": ["test"]
+    },
+    {
+      "name": "массив фильтров сворачивается через AND",
+      "filter": [
+        { "type": "number", "field": "serviceId", "operator": "$eq", "value": 42 },
+        { "type": "string", "field": "name", "operator": "$contains", "value": "abc" }
+      ],
+      "sql": "(\"service_id\" = $1 AND \"name\" ILIKE $2)",
+      "args": [42, "%abc%"]
+    },
+    {
+      "name": "регрессия: вложенная группа не съедает соседей",
+      "filter": {
+        "conjunction": "$and",
+        "children": [
+          { "type": "number", "field": "serviceId", "operator": "$eq", "value": 42 },
+          {
+            "conjunction": "$or",
+            "children": [
+              { "type": "string", "field": "name", "operator": "$contains", "value": "a" },
+              { "type": "string", "field": "name", "operator": "$contains", "value": "b" }
+            ]
+          }
+        ]
+      },
+      "sql": "(\"service_id\" = $1 AND (\"name\" ILIKE $2 OR \"name\" ILIKE $3))",
+      "args": [42, "%a%", "%b%"]
+    },
+    {
+      "name": "регрессия: группа первым ребёнком тоже не съедает соседей",
+      "filter": {
+        "conjunction": "$and",
+        "children": [
+          {
+            "conjunction": "$or",
+            "children": [
+              { "type": "string", "field": "name", "operator": "$eq", "value": "a" },
+              { "type": "string", "field": "name", "operator": "$eq", "value": "b" }
+            ]
+          },
+          { "type": "number", "field": "serviceId", "operator": "$eq", "value": 42 }
+        ]
+      },
+      "sql": "((\"name\" = $1 OR \"name\" = $2) AND \"service_id\" = $3)",
+      "args": ["a", "b", 42]
+    },
+    {
+      "name": "регрессия: $not сохраняет всех детей",
+      "filter": {
+        "conjunction": "$not",
+        "children": [
+          { "type": "string", "field": "name", "operator": "$eq", "value": "a" },
+          { "type": "string", "field": "status", "operator": "$eq", "value": "done" }
+        ]
+      },
+      "sql": "NOT ((\"name\" = $1 AND \"status\" = $2))",
+      "args": ["a", "done"]
+    },
+    {
+      "name": "регрессия: $neq рендерится, а не падает",
+      "filter": { "type": "number", "field": "attempts", "operator": "$neq", "value": 3 },
+      "sql": "NOT (\"call_attempts\" = $1)",
+      "args": [3]
+    },
+    {
+      "name": "регрессия: $not_contains рендерится",
+      "filter": { "type": "string", "field": "name", "operator": "$not_contains", "value": "x" },
+      "sql": "NOT (\"name\" ILIKE $1)",
+      "args": ["%x%"]
+    },
+    {
+      "name": "регрессия: $is_not_empty рендерится",
+      "filter": { "type": "string", "field": "name", "operator": "$is_not_empty" },
+      "sql": "NOT ((\"name\" IS NULL OR \"name\" = ''))",
+      "args": []
+    },
+    {
+      "name": "строковые операторы",
+      "filter": {
+        "conjunction": "$and",
+        "children": [
+          { "type": "string", "field": "name", "operator": "$starts_with", "value": "pre" },
+          { "type": "string", "field": "name", "operator": "$ends_with", "value": "suf" },
+          { "type": "string", "field": "name", "operator": "$regex", "value": "^a.*z$" },
+          { "type": "string", "field": "status", "operator": "$is_empty" }
+        ]
+      },
+      "sql": "(\"name\" ILIKE $1 AND \"name\" ILIKE $2 AND \"name\" ~ $3 AND (\"status\" IS NULL OR \"status\" = ''))",
+      "args": ["pre%", "%suf", "^a.*z$"]
+    },
+    {
+      "name": "числовые сравнения",
+      "filter": {
+        "conjunction": "$and",
+        "children": [
+          { "type": "number", "field": "attempts", "operator": "$gt", "value": 1 },
+          { "type": "number", "field": "attempts", "operator": "$gte", "value": 2 },
+          { "type": "number", "field": "attempts", "operator": "$lt", "value": 9 },
+          { "type": "number", "field": "attempts", "operator": "$lte", "value": 8 }
+        ]
+      },
+      "sql": "(\"call_attempts\" > $1 AND \"call_attempts\" >= $2 AND \"call_attempts\" < $3 AND \"call_attempts\" <= $4)",
+      "args": [1, 2, 9, 8]
+    },
+    {
+      "name": "булево поле",
+      "filter": { "type": "boolean", "field": "isActive", "operator": "$eq", "value": true },
+      "sql": "\"is_active\" = $1",
+      "args": [true]
+    },
+    {
+      "name": "даты: сравнение и диапазон",
+      "filter": {
+        "conjunction": "$or",
+        "children": [
+          { "type": "date", "field": "createdAt", "operator": "$gte", "value": "2026-01-01T00:00:00Z" },
+          { "type": "date", "field": "createdAt", "operator": "$between", "value": ["2026-02-01T00:00:00Z", "2026-03-01T00:00:00Z"] },
+          { "type": "date", "field": "createdAt", "operator": "$is_today" }
+        ]
+      },
+      "sql": "(\"created_at\" >= $1 OR \"created_at\" BETWEEN $2 AND $3 OR \"created_at\"::date = CURRENT_DATE)",
+      "args": ["2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z", "2026-03-01T00:00:00Z"]
+    },
+    {
+      "name": "поле по связи получает префикс таблицы",
+      "filter": { "type": "string", "field": "groupName", "operator": "$eq", "value": "g" },
+      "sql": "\"task_group\".\"name\" = $1",
+      "args": ["g"]
+    },
+    {
+      "name": "scope всегда оборачивает клиентское дерево",
+      "scope": [{ "field": "serviceId", "value": 777 }],
+      "filter": {
+        "conjunction": "$or",
+        "children": [
+          { "type": "string", "field": "name", "operator": "$eq", "value": "a" },
+          { "type": "string", "field": "name", "operator": "$eq", "value": "b" }
+        ]
+      },
+      "sql": "(\"service_id\" = $1 AND (\"name\" = $2 OR \"name\" = $3))",
+      "args": [777, "a", "b"]
+    },
+    {
+      "name": "scope без клиентского фильтра",
+      "scope": [{ "field": "serviceId", "value": 777 }],
+      "filter": null,
+      "sql": "\"service_id\" = $1",
+      "args": [777]
+    },
+    {
+      "name": "ошибка: поле вне белого списка",
+      "filter": { "type": "string", "field": "password", "operator": "$eq", "value": "x" },
+      "error": "unknown field"
+    },
+    {
+      "name": "ошибка: группа без conjunction",
+      "filter": { "children": [{ "type": "string", "field": "name", "operator": "$eq", "value": "a" }] },
+      "error": "invalid node"
+    },
+    {
+      "name": "ошибка: пустая группа",
+      "filter": { "conjunction": "$and", "children": [] },
+      "error": "empty group"
+    },
+    {
+      "name": "ошибка: оператор не подходит типу поля",
+      "filter": { "type": "number", "field": "attempts", "operator": "$contains", "value": "x" },
+      "error": "unsupported operator"
+    },
+    {
+      "name": "ошибка: тип значения не совпадает с типом поля",
+      "filter": { "type": "number", "field": "attempts", "operator": "$eq", "value": "три" },
+      "error": "invalid value"
+    },
+    {
+      "name": "ошибка: тип в фильтре не совпадает с типом поля в схеме",
+      "filter": { "type": "string", "field": "attempts", "operator": "$eq", "value": "3" },
+      "error": "type mismatch"
+    }
+  ]
+}
