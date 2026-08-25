@@ -42,12 +42,12 @@ func (s *ScopeFilter) UnmarshalJSON(data []byte) error {
 func TestGolden(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join("..", "testdata", "cases.json"))
 	if err != nil {
-		t.Fatalf("прочитать вектора: %v", err)
+		t.Fatalf("read vectors: %v", err)
 	}
 
 	var golden goldenFile
 	if err := json.Unmarshal(data, &golden); err != nil {
-		t.Fatalf("разобрать вектора: %v", err)
+		t.Fatalf("parse vectors: %v", err)
 	}
 
 	for _, testCase := range golden.Cases {
@@ -58,7 +58,7 @@ func TestGolden(t *testing.T) {
 				var root Root
 				if err := json.Unmarshal(testCase.Filter, &root); err != nil {
 					if testCase.Error == "" {
-						t.Fatalf("разобрать фильтр: %v", err)
+						t.Fatalf("parse filter: %v", err)
 					}
 					return
 				}
@@ -70,22 +70,22 @@ func TestGolden(t *testing.T) {
 
 			if testCase.Error != "" {
 				if err == nil {
-					t.Fatalf("ждали ошибку %q, получили SQL %q", testCase.Error, sql)
+					t.Fatalf("expected error %q, got SQL %q", testCase.Error, sql)
 				}
 				if !strings.Contains(err.Error(), testCase.Error) {
-					t.Fatalf("ждали ошибку %q, получили %q", testCase.Error, err.Error())
+					t.Fatalf("expected error %q, got %q", testCase.Error, err.Error())
 				}
 				return
 			}
 
 			if err != nil {
-				t.Fatalf("неожиданная ошибка: %v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 			if sql != testCase.SQL {
-				t.Errorf("SQL не совпал\nждали:   %s\nполучили: %s", testCase.SQL, sql)
+				t.Errorf("SQL mismatch\nwant: %s\ngot:  %s", testCase.SQL, sql)
 			}
 			if got, want := toJSON(t, args), toJSON(t, testCase.Args); got != want {
-				t.Errorf("аргументы не совпали\nждали:   %s\nполучили: %s", want, got)
+				t.Errorf("args mismatch\nwant: %s\ngot:  %s", want, got)
 			}
 		})
 	}
@@ -98,7 +98,7 @@ func toJSON(t *testing.T, values []any) string {
 	}
 	encoded, err := json.Marshal(values)
 	if err != nil {
-		t.Fatalf("сериализовать: %v", err)
+		t.Fatalf("marshal: %v", err)
 	}
 	return string(encoded)
 }
@@ -119,20 +119,20 @@ func TestFoldKeepsEveryLeaf(t *testing.T) {
 
 		spec, err := Parse(node, schema)
 		if err != nil {
-			t.Fatalf("разбор упал на дереве %+v: %v", node, err)
+			t.Fatalf("parse failed on tree %+v: %v", node, err)
 		}
 
 		leaves := Leaves(spec)
 		if len(leaves) != expected {
-			t.Fatalf("листьев на входе %d, в дереве %d\n%+v", expected, len(leaves), node)
+			t.Fatalf("leaves in: %d, leaves out: %d\n%+v", expected, len(leaves), node)
 		}
 
 		sql, args, err := Render(Query{Filter: &node}, schema)
 		if err != nil {
-			t.Fatalf("рендер упал: %v", err)
+			t.Fatalf("render failed: %v", err)
 		}
 		if placeholders := strings.Count(sql, "$"); placeholders != len(args) {
-			t.Fatalf("плейсхолдеров %d, аргументов %d: %s", placeholders, len(args), sql)
+			t.Fatalf("placeholders: %d, args: %d\n%s", placeholders, len(args), sql)
 		}
 	}
 }
@@ -171,6 +171,6 @@ func TestSchemaIsTheOnlySourceOfIdentifiers(t *testing.T) {
 	node := Node{Type: TypeString, Field: `name"; DROP TABLE task; --`, Operator: "$eq", Value: "x"}
 
 	if _, _, err := Render(Query{Filter: &node}, schema); err == nil {
-		t.Fatal("поле вне схемы должно быть ошибкой")
+		t.Fatal("a field outside the schema must be an error")
 	}
 }

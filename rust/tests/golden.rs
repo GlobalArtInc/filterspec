@@ -35,8 +35,8 @@ struct GoldenCase {
 
 #[test]
 fn golden_vectors() {
-    let raw = std::fs::read_to_string("../testdata/cases.json").expect("прочитать вектора");
-    let golden: GoldenFile = serde_json::from_str(&raw).expect("разобрать вектора");
+    let raw = std::fs::read_to_string("../testdata/cases.json").expect("read vectors");
+    let golden: GoldenFile = serde_json::from_str(&raw).expect("parse vectors");
     let schema: Schema = golden.schema;
 
     for case in golden.cases {
@@ -47,7 +47,7 @@ fn golden_vectors() {
                 Err(_) => {
                     assert!(
                         case.error.is_some(),
-                        "{}: фильтр не разобрался, а ошибка не ожидалась",
+                        "{}: filter did not parse and no error was expected",
                         case.name
                     );
                     continue;
@@ -63,19 +63,16 @@ fn golden_vectors() {
         match (render(&query, &schema), &case.error) {
             (Err(err), Some(expected)) => assert!(
                 err.to_string().contains(expected),
-                "{}: ждали ошибку {expected:?}, получили {err}",
+                "{}: expected error {expected:?}, got {err}",
                 case.name
             ),
-            (Err(err), None) => panic!("{}: неожиданная ошибка {err}", case.name),
+            (Err(err), None) => panic!("{}: unexpected error {err}", case.name),
             (Ok((sql, _)), Some(expected)) => {
-                panic!(
-                    "{}: ждали ошибку {expected:?}, получили SQL {sql}",
-                    case.name
-                )
+                panic!("{}: expected error {expected:?}, got SQL {sql}", case.name)
             }
             (Ok((sql, args)), None) => {
                 assert_eq!(sql, case.sql.unwrap_or_default(), "{}: SQL", case.name);
-                assert_eq!(args, case.args, "{}: аргументы", case.name);
+                assert_eq!(args, case.args, "{}: args", case.name);
             }
         }
     }
@@ -111,23 +108,19 @@ fn fold_keeps_every_leaf() {
         let node_json = random_node(&mut rng, 0);
         let expected = count_leaves(&node_json);
 
-        let node: Node = serde_json::from_value(node_json.clone()).expect("собрать узел");
-        let spec = parse(&node, &schema).expect("разобрать дерево");
-        assert_eq!(
-            leaves(&spec).len(),
-            expected,
-            "листья потерялись на {node_json}"
-        );
+        let node: Node = serde_json::from_value(node_json.clone()).expect("build node");
+        let spec = parse(&node, &schema).expect("parse tree");
+        assert_eq!(leaves(&spec).len(), expected, "leaves lost on {node_json}");
 
         let query = Query {
             scope: Vec::new(),
             filter: Some(node),
         };
-        let (sql, args) = render(&query, &schema).expect("отрендерить");
+        let (sql, args) = render(&query, &schema).expect("render");
         assert_eq!(
             sql.matches('$').count(),
             args.len(),
-            "плейсхолдеры и аргументы разошлись: {sql}"
+            "placeholders and args diverged: {sql}"
         );
     }
 }
@@ -174,7 +167,7 @@ fn schema_is_the_only_source_of_identifiers() {
         "operator": "$eq",
         "value": "x"
     }))
-    .expect("собрать узел");
+    .expect("build node");
 
     let query = Query {
         scope: Vec::new(),
@@ -183,6 +176,6 @@ fn schema_is_the_only_source_of_identifiers() {
 
     assert!(
         render(&query, &schema).is_err(),
-        "поле вне схемы должно быть ошибкой"
+        "a field outside the schema must be an error"
     );
 }

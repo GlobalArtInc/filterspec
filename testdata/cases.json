@@ -10,13 +10,13 @@
   },
   "cases": [
     {
-      "name": "одиночный фильтр",
+      "name": "single filter",
       "filter": { "type": "string", "field": "name", "operator": "$eq", "value": "test" },
       "sql": "\"name\" = $1",
       "args": ["test"]
     },
     {
-      "name": "массив фильтров сворачивается через AND",
+      "name": "an array of filters folds with AND",
       "filter": [
         { "type": "number", "field": "serviceId", "operator": "$eq", "value": 42 },
         { "type": "string", "field": "name", "operator": "$contains", "value": "abc" }
@@ -25,7 +25,7 @@
       "args": [42, "%abc%"]
     },
     {
-      "name": "регрессия: вложенная группа не съедает соседей",
+      "name": "regression: a nested group does not swallow its siblings",
       "filter": {
         "conjunction": "$and",
         "children": [
@@ -43,7 +43,7 @@
       "args": [42, "%a%", "%b%"]
     },
     {
-      "name": "регрессия: группа первым ребёнком тоже не съедает соседей",
+      "name": "regression: a group as the first child does not swallow the rest either",
       "filter": {
         "conjunction": "$and",
         "children": [
@@ -61,7 +61,7 @@
       "args": ["a", "b", 42]
     },
     {
-      "name": "регрессия: $not сохраняет всех детей",
+      "name": "regression: $not keeps every child",
       "filter": {
         "conjunction": "$not",
         "children": [
@@ -73,25 +73,25 @@
       "args": ["a", "done"]
     },
     {
-      "name": "регрессия: $neq рендерится, а не падает",
+      "name": "regression: $neq renders instead of failing",
       "filter": { "type": "number", "field": "attempts", "operator": "$neq", "value": 3 },
       "sql": "NOT (\"call_attempts\" = $1)",
       "args": [3]
     },
     {
-      "name": "регрессия: $not_contains рендерится",
+      "name": "regression: $not_contains renders",
       "filter": { "type": "string", "field": "name", "operator": "$not_contains", "value": "x" },
       "sql": "NOT (\"name\" ILIKE $1)",
       "args": ["%x%"]
     },
     {
-      "name": "регрессия: $is_not_empty рендерится",
+      "name": "regression: $is_not_empty renders",
       "filter": { "type": "string", "field": "name", "operator": "$is_not_empty" },
       "sql": "NOT ((\"name\" IS NULL OR \"name\" = ''))",
       "args": []
     },
     {
-      "name": "строковые операторы",
+      "name": "string operators",
       "filter": {
         "conjunction": "$and",
         "children": [
@@ -105,7 +105,7 @@
       "args": ["pre%", "%suf", "^a.*z$"]
     },
     {
-      "name": "числовые сравнения",
+      "name": "number comparisons",
       "filter": {
         "conjunction": "$and",
         "children": [
@@ -119,13 +119,13 @@
       "args": [1, 2, 9, 8]
     },
     {
-      "name": "булево поле",
+      "name": "boolean field",
       "filter": { "type": "boolean", "field": "isActive", "operator": "$eq", "value": true },
       "sql": "\"is_active\" = $1",
       "args": [true]
     },
     {
-      "name": "даты: сравнение и диапазон",
+      "name": "dates: comparison and range",
       "filter": {
         "conjunction": "$or",
         "children": [
@@ -138,13 +138,13 @@
       "args": ["2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z", "2026-03-01T00:00:00Z"]
     },
     {
-      "name": "поле по связи получает префикс таблицы",
+      "name": "a field on a relation gets the table prefix",
       "filter": { "type": "string", "field": "groupName", "operator": "$eq", "value": "g" },
       "sql": "\"task_group\".\"name\" = $1",
       "args": ["g"]
     },
     {
-      "name": "scope всегда оборачивает клиентское дерево",
+      "name": "scope always wraps the client tree",
       "scope": [{ "field": "serviceId", "value": 777 }],
       "filter": {
         "conjunction": "$or",
@@ -157,39 +157,39 @@
       "args": [777, "a", "b"]
     },
     {
-      "name": "scope без клиентского фильтра",
+      "name": "scope without a client filter",
       "scope": [{ "field": "serviceId", "value": 777 }],
       "filter": null,
       "sql": "\"service_id\" = $1",
       "args": [777]
     },
     {
-      "name": "ошибка: поле вне белого списка",
+      "name": "error: field outside the whitelist",
       "filter": { "type": "string", "field": "password", "operator": "$eq", "value": "x" },
       "error": "unknown field"
     },
     {
-      "name": "ошибка: группа без conjunction",
+      "name": "error: group without a conjunction",
       "filter": { "children": [{ "type": "string", "field": "name", "operator": "$eq", "value": "a" }] },
       "error": "invalid node"
     },
     {
-      "name": "ошибка: пустая группа",
+      "name": "error: empty group",
       "filter": { "conjunction": "$and", "children": [] },
       "error": "empty group"
     },
     {
-      "name": "ошибка: оператор не подходит типу поля",
+      "name": "error: operator does not fit the field type",
       "filter": { "type": "number", "field": "attempts", "operator": "$contains", "value": "x" },
       "error": "unsupported operator"
     },
     {
-      "name": "ошибка: тип значения не совпадает с типом поля",
-      "filter": { "type": "number", "field": "attempts", "operator": "$eq", "value": "три" },
+      "name": "error: value type does not match the field type",
+      "filter": { "type": "number", "field": "attempts", "operator": "$eq", "value": "three" },
       "error": "invalid value"
     },
     {
-      "name": "ошибка: тип в фильтре не совпадает с типом поля в схеме",
+      "name": "error: filter type does not match the schema field type",
       "filter": { "type": "string", "field": "attempts", "operator": "$eq", "value": "3" },
       "error": "type mismatch"
     }
